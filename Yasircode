@@ -1,32 +1,17 @@
-
-/* =====================================================
-   QAANCIYE FILM BOT PRO
-   GITHUB + RENDER EDITION
-   NODE.JS - SINGLE FILE
-
-   OWNER: 6714164629
-   CHANNEL: @Qaanciye
-   SUPPORT: @Mrbosstiger
-
-   TOKEN: 9111277427:AAGWDI3sauGzZLykWrcBu4DA2-hIKKEoJ-A ENVIRONMENT VARIABLE
-===================================================== */
-
 const TelegramBot = require("node-telegram-bot-api");
 const fs = require("fs");
 const path = require("path");
 
-const TOKEN = process.env.BOT_TOKEN;
+const TOKEN = process.env.9111277427:AAGWDI3sauGzZLykWrcBu4DA2-hIKKEoJ-A;
 const OWNER = "6714164629";
 const CHANNEL = "@Qaanciye";
 const SUPPORT = "@Mrbosstiger";
 
 if (!TOKEN) {
-  console.error("9111277427:AAGWDI3sauGzZLykWrcBu4DA2-hIKKEoJ-A");
-  process.exit(1);
+  throw new Error("9111277427:AAGWDI3sauGzZLykWrcBu4DA2-hIKKEoJ-A");
 }
 
 const bot = new TelegramBot(TOKEN, { polling: true });
-
 const DB_FILE = path.join(__dirname, "database.json");
 
 let db = {
@@ -39,13 +24,10 @@ let db = {
 function loadDB() {
   try {
     if (fs.existsSync(DB_FILE)) {
-      const data = JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
-      db = {
-        films: Array.isArray(data.films) ? data.films : [],
-        dramas: Array.isArray(data.dramas) ? data.dramas : [],
-        users: Array.isArray(data.users) ? data.users : [],
-        admins: Array.isArray(data.admins) ? data.admins : [OWNER]
-      };
+      const saved = JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
+      for (const key of ["films", "dramas", "users", "admins"]) {
+        if (Array.isArray(saved[key])) db[key] = saved[key];
+      }
     }
   } catch (e) {
     console.error("Database error:", e.message);
@@ -68,48 +50,33 @@ function isAdmin(id) {
   return db.admins.includes(String(id));
 }
 
+function send(id, text) {
+  return bot.sendMessage(id, text, { parse_mode: "HTML" });
+}
+
+function normalize(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFKC")
+    .replace(/[^\p{L}\p{N}]/gu, "");
+}
+
 function addUser(user) {
   const id = String(user.id);
+  let old = db.users.find(u => String(u.id) === id);
 
-  if (!db.users.some(u => String(u.id) === id)) {
+  if (old) {
+    old.name = user.first_name || old.name;
+    old.username = user.username || old.username;
+  } else {
     db.users.push({
       id,
       name: user.first_name || "User",
       username: user.username || "",
       joined: new Date().toISOString()
     });
-    saveDB();
   }
-}
-
-function normalize(text) {
-  return String(text || "")
-    .toLowerCase()
-    .normalize("NFKC")
-    .replace(/[^\p{L}\p{N}]/gu, "");
-}
-
-function send(chatId, text) {
-  return bot.sendMessage(chatId, text, {
-    parse_mode: "HTML"
-  });
-}
-
-function menu() {
-  return `🎬 <b>KU SOO DHAWOOW QAANCIYE FILM BOT PRO!</b>
-
-👋 Soo dhowow!
-
-🎞 /films - Liiska filimada
-📺 /dramas - Liiska musalsallada
-🔎 /movie MAGACA - Raadi filim
-📚 /drama MAGACA - Raadi musalsal
-
-👤 /register - Isdiiwaangeli
-👑 /admin - Maamulka
-
-📢 Channel: ${CHANNEL}
-🛠 Support: ${SUPPORT}`;
+  saveDB();
 }
 
 function adminPanel() {
@@ -132,69 +99,63 @@ function adminPanel() {
 ❌ /cancel`;
 }
 
-async function sendMedia(chatId, item, type) {
-  const caption =
-    `${type === "film" ? "🎬" : "📺"} ${item.title}\n\n` +
-    `QAANCIYE FILM BOT PRO\n${CHANNEL}`;
+function menu() {
+  return `🎬 <b>KU SOO DHAWOOW QAANCIYE FILM BOT PRO!</b>
 
+🎞 /films - Liiska filimada
+📺 /dramas - Liiska musalsallada
+🔎 /movie MAGACA - Raadi filim
+📚 /drama MAGACA - Raadi musalsal
+
+👤 /register - Isdiiwaangeli
+👑 /admin - Maamulka
+
+📢 Channel: ${CHANNEL}
+🛠 Support: ${SUPPORT}`;
+}
+
+async function sendMedia(chatId, item, type) {
   return bot.sendVideo(chatId, item.file_id, {
-    caption,
+    caption:
+      `${type === "film" ? "🎬" : "📺"} ${item.title}\n\n` +
+      `QAANCIYE FILM BOT PRO\n${CHANNEL}`,
     protect_content: true
   });
 }
-
-/* START */
 
 bot.onText(/^\/start$/, msg => {
   addUser(msg.from);
   send(msg.chat.id, menu());
 });
 
-/* REGISTER */
-
 bot.onText(/^\/register$/, msg => {
   addUser(msg.from);
   send(msg.chat.id, "✅ Waad ka diiwaangashan tahay QAANCIYE FILM BOT PRO.");
 });
 
-/* ADMIN */
-
 bot.onText(/^\/admin$/, msg => {
   if (!isAdmin(msg.from.id)) {
-    return send(msg.chat.id, "⛔ Ma lihid awoodda maamulka.");
+    return send(msg.chat.id, "⛔ Admin kaliya.");
   }
-
   send(msg.chat.id, adminPanel());
 });
-
-/* CANCEL */
 
 bot.onText(/^\/cancel$/, msg => {
   waiting.delete(String(msg.from.id));
   send(msg.chat.id, "❌ Hawsha waa la joojiyay.");
 });
 
-/* ADD FILM */
-
 bot.onText(/^\/addfilm$/, msg => {
   if (!isAdmin(msg.from.id)) return send(msg.chat.id, "⛔ Admin kaliya.");
-
   waiting.set(String(msg.from.id), "film");
-  send(msg.chat.id,
-    "🎬 Soo dir VIDEO-ga filimka.\n\nCaption-ka ku qor magaca filimka.\n/cancel si aad u joojiso.");
+  send(msg.chat.id, "🎬 Soo dir video-ga filimka. Caption-ka ku qor magaca.");
 });
-
-/* ADD DRAMA */
 
 bot.onText(/^\/adddrama$/, msg => {
   if (!isAdmin(msg.from.id)) return send(msg.chat.id, "⛔ Admin kaliya.");
-
   waiting.set(String(msg.from.id), "drama");
-  send(msg.chat.id,
-    "📺 Soo dir VIDEO-ga musalsalka.\n\nCaption-ka ku qor magaca.\n/cancel si aad u joojiso.");
+  send(msg.chat.id, "📺 Soo dir video-ga musalsalka. Caption-ka ku qor magaca.");
 });
-
-/* RECEIVE VIDEO */
 
 bot.on("message", async msg => {
   if (!msg.from) return;
@@ -204,14 +165,10 @@ bot.on("message", async msg => {
   const id = String(msg.from.id);
   const task = waiting.get(id);
 
-  if (!task || !isAdmin(id)) return;
-  if (!msg.video) return;
+  if (!task || !isAdmin(id) || !msg.video) return;
 
   const title = String(msg.caption || "").trim();
-
-  if (!title) {
-    return send(msg.chat.id, "❌ Video-ga caption ugu qor magaca.");
-  }
+  if (!title) return send(msg.chat.id, "❌ Caption-ka ku qor magaca.");
 
   const list = task === "film" ? db.films : db.dramas;
 
@@ -225,172 +182,117 @@ bot.on("message", async msg => {
   saveDB();
   waiting.delete(id);
 
-  send(msg.chat.id,
-    `✅ <b>WAA LA KAYDIYAY!</b>\n\nMagac: ${title}\nNooc: ${task}`);
+  send(msg.chat.id, `✅ Waa la kaydiyey!\n\n🎬 ${title}`);
 });
-
-/* FILM LIST */
 
 bot.onText(/^\/films$/, msg => {
-  if (!db.films.length) {
-    return send(msg.chat.id, "📭 Filim lama hayo.");
-  }
-
-  const text = db.films.map((f, i) =>
-    `${i + 1}. ${f.title}`
-  ).join("\n");
-
-  send(msg.chat.id, "🎬 <b>FILMS LIST</b>\n\n" + text);
+  const text = db.films.map((f, i) => `${i + 1}. ${f.title}`).join("\n");
+  send(msg.chat.id, "🎬 <b>FILMS</b>\n\n" + (text || "Filim lama hayo."));
 });
-
-/* DRAMA LIST */
 
 bot.onText(/^\/dramas$/, msg => {
-  if (!db.dramas.length) {
-    return send(msg.chat.id, "📭 Musalsal lama hayo.");
-  }
-
-  const text = db.dramas.map((d, i) =>
-    `${i + 1}. ${d.title}`
-  ).join("\n");
-
-  send(msg.chat.id, "📺 <b>DRAMA LIST</b>\n\n" + text);
+  const text = db.dramas.map((d, i) => `${i + 1}. ${d.title}`).join("\n");
+  send(msg.chat.id, "📺 <b>DRAMAS</b>\n\n" + (text || "Musalsal lama hayo."));
 });
-
-/* SEARCH FILM */
 
 bot.onText(/^\/movie(?:\s+(.+))?$/i, async (msg, match) => {
   const query = (match[1] || "").trim();
+  if (!query) return send(msg.chat.id, "Isticmaal: /movie MAGACA");
 
-  if (!query) {
-    return send(msg.chat.id, "Isticmaal: /movie MAGACA");
-  }
-
-  const item = db.films.find(f =>
-    normalize(f.title) === normalize(query)
-  );
-
-  if (!item) {
-    return send(msg.chat.id, "❌ Filimkan lama helin.");
-  }
+  const item = db.films.find(f => normalize(f.title) === normalize(query));
+  if (!item) return send(msg.chat.id, "❌ Filimkan lama helin.");
 
   try {
     await sendMedia(msg.chat.id, item, "film");
   } catch (e) {
+    console.error(e.message);
     send(msg.chat.id, "❌ Video-ga lama diri karin.");
   }
 });
 
-/* SEARCH DRAMA */
-
 bot.onText(/^\/drama(?:\s+(.+))?$/i, async (msg, match) => {
   const query = (match[1] || "").trim();
+  if (!query) return send(msg.chat.id, "Isticmaal: /drama MAGACA");
 
-  if (!query) {
-    return send(msg.chat.id, "Isticmaal: /drama MAGACA");
-  }
-
-  const item = db.dramas.find(d =>
-    normalize(d.title) === normalize(query)
-  );
-
-  if (!item) {
-    return send(msg.chat.id, "❌ Musalsalkan lama helin.");
-  }
+  const item = db.dramas.find(d => normalize(d.title) === normalize(query));
+  if (!item) return send(msg.chat.id, "❌ Musalsalkan lama helin.");
 
   try {
     await sendMedia(msg.chat.id, item, "drama");
   } catch (e) {
+    console.error(e.message);
     send(msg.chat.id, "❌ Video-ga lama diri karin.");
   }
 });
-
-/* DELETE FILM */
 
 bot.onText(/^\/deletefilm\s+(.+)$/i, msg => {
   if (!isAdmin(msg.from.id)) return send(msg.chat.id, "⛔ Admin kaliya.");
 
   const name = normalize(msg.text.replace(/^\/deletefilm\s+/i, ""));
   const old = db.films.length;
-
   db.films = db.films.filter(f => normalize(f.title) !== name);
   saveDB();
 
-  send(msg.chat.id,
-    old === db.films.length ? "❌ Filim lama helin." : "✅ Filim waa la tirtiray.");
+  send(msg.chat.id, old === db.films.length ? "❌ Lama helin." : "✅ Filim waa la tirtiray.");
 });
-
-/* DELETE DRAMA */
 
 bot.onText(/^\/deletedrama\s+(.+)$/i, msg => {
   if (!isAdmin(msg.from.id)) return send(msg.chat.id, "⛔ Admin kaliya.");
 
   const name = normalize(msg.text.replace(/^\/deletedrama\s+/i, ""));
   const old = db.dramas.length;
-
   db.dramas = db.dramas.filter(d => normalize(d.title) !== name);
   saveDB();
 
-  send(msg.chat.id,
-    old === db.dramas.length ? "❌ Musalsal lama helin." : "✅ Musalsal waa la tirtiray.");
+  send(msg.chat.id, old === db.dramas.length ? "❌ Lama helin." : "✅ Musalsal waa la tirtiray.");
 });
-
-/* LIST USERS */
 
 bot.onText(/^\/users$/, msg => {
   if (!isAdmin(msg.from.id)) return send(msg.chat.id, "⛔ Admin kaliya.");
 
-  const list = db.users.slice(0, 50).map((u, i) =>
-    `${i + 1}. ${u.name} - ${u.id}`
-  ).join("\n");
+  const text = db.users.slice(0, 50)
+    .map((u, i) => `${i + 1}. ${u.name} - ${u.id}`)
+    .join("\n");
 
-  send(msg.chat.id,
-    `👥 <b>USERS (${db.users.length})</b>\n\n${list || "Ma jiraan users."}`);
+  send(msg.chat.id, `👥 USERS: ${db.users.length}\n\n${text || "Ma jiraan users."}`);
 });
 
-/* ADD ADMIN */
-
 bot.onText(/^\/addadmin\s+(\d+)$/, msg => {
-  if (String(msg.from.id) !== OWNER) {
-    return send(msg.chat.id, "⛔ Owner kaliya.");
-  }
+  if (String(msg.from.id) !== OWNER) return send(msg.chat.id, "⛔ Owner kaliya.");
 
   const id = msg.text.split(/\s+/)[1];
-
   if (!db.admins.includes(id)) {
     db.admins.push(id);
     saveDB();
   }
-
   send(msg.chat.id, "✅ Admin waa lagu daray: " + id);
 });
 
-/* REMOVE ADMIN */
-
 bot.onText(/^\/deladmin\s+(\d+)$/, msg => {
-  if (String(msg.from.id) !== OWNER) {
-    return send(msg.chat.id, "⛔ Owner kaliya.");
-  }
+  if (String(msg.from.id) !== OWNER) return send(msg.chat.id, "⛔ Owner kaliya.");
 
   const id = msg.text.split(/\s+/)[1];
-
-  if (id === OWNER) {
-    return send(msg.chat.id, "❌ Owner lama saari karo.");
-  }
+  if (id === OWNER) return send(msg.chat.id, "❌ Owner lama saari karo.");
 
   db.admins = db.admins.filter(a => a !== id);
   saveDB();
-
   send(msg.chat.id, "✅ Admin waa laga saaray.");
 });
 
-/* STATISTICS */
+bot.onText(/^\/listfilms$/, msg => {
+  if (!isAdmin(msg.from.id)) return send(msg.chat.id, "⛔ Admin kaliya.");
+  send(msg.chat.id, db.films.map((f, i) => `${i + 1}. ${f.title}`).join("\n") || "Filim ma jiro.");
+});
+
+bot.onText(/^\/listdramas$/, msg => {
+  if (!isAdmin(msg.from.id)) return send(msg.chat.id, "⛔ Admin kaliya.");
+  send(msg.chat.id, db.dramas.map((d, i) => `${i + 1}. ${d.title}`).join("\n") || "Musalsal ma jiro.");
+});
 
 bot.onText(/^\/stats$/, msg => {
   if (!isAdmin(msg.from.id)) return send(msg.chat.id, "⛔ Admin kaliya.");
 
-  send(msg.chat.id,
-    `📊 <b>QAANCIYE STATISTICS</b>
+  send(msg.chat.id, `📊 <b>QAANCIYE STATISTICS</b>
 
 👥 Users: ${db.users.length}
 🎬 Films: ${db.films.length}
@@ -398,43 +300,29 @@ bot.onText(/^\/stats$/, msg => {
 👑 Admins: ${db.admins.length}`);
 });
 
-/* BROADCAST */
-
 bot.onText(/^\/broadcast\s+([\s\S]+)$/i, async (msg, match) => {
   if (!isAdmin(msg.from.id)) return send(msg.chat.id, "⛔ Admin kaliya.");
 
   const text = match[1].trim();
-
-  if (!text) return send(msg.chat.id, "Isticmaal: /broadcast QORAAL");
-
   let sent = 0;
   let failed = 0;
 
   await send(msg.chat.id, "📢 Broadcast ayaa bilaabmaya...");
 
-  for (const u of db.users) {
+  for (const user of db.users) {
     try {
-      await bot.sendMessage(u.id, text);
+      await bot.sendMessage(user.id, text);
       sent++;
     } catch (e) {
       failed++;
     }
-
     await new Promise(resolve => setTimeout(resolve, 40));
   }
 
-  send(msg.chat.id,
-    `📢 <b>BROADCAST DHAMMAADAY</b>\n\n✅ Sent: ${sent}\n❌ Failed: ${failed}`);
+  send(msg.chat.id, `📢 <b>BROADCAST DHAMMAADAY</b>\n\n✅ Sent: ${sent}\n❌ Failed: ${failed}`);
 });
 
-/* ERROR HANDLER */
-
-bot.on("polling_error", error => {
-  console.error("Polling error:", error.message);
-});
-
-process.on("uncaughtException", error => {
-  console.error("Application error:", error);
-});
+bot.on("polling_error", error => console.error("Polling:", error.message));
+bot.on("error", error => console.error("Bot:", error.message));
 
 console.log("QAANCIYE FILM BOT PRO is running!");
